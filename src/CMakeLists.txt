@@ -9,7 +9,11 @@ set(CMAKE_AUTOMOC ON)
 # create code from a list of Qt designer ui files
 set(CMAKE_AUTOUIC ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -msse3")
+if(APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -msse3")
+endif()
 
 if(APPLE)
     add_compile_definitions(Q_OS_MAC)
