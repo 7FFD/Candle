@@ -903,7 +903,7 @@ void frmMain::onSerialPortReadyRead()
 
                 // Test for job complete
                 if (m_processingFile && m_transferCompleted &&
-                        ((status == IDLE && m_lastGrblStatus == RUN) || status == CHECK)) {
+                        ((status == IDLE && m_lastGrblStatus != IDLE && m_lastGrblStatus != -1) || status == CHECK)) {
                     qDebug() << "job completed:" << m_fileCommandIndex << m_currentModel->rowCount() - 1;
 
                     // Shadow last segment
