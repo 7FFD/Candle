@@ -118,6 +118,8 @@ public:
     bool autoLine();
     void setAutoLine(bool value);
 
+    void resetToDefaults();
+
 protected:
     void showEvent(QShowEvent *se);
 

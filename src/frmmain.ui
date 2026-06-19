@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>952</width>
-    <height>847</height>
+    <height>892</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -354,11 +354,11 @@ QSlider::handle:horizontal:hover {
              <property name="gridStyle">
               <enum>Qt::DashLine</enum>
              </property>
-             <attribute name="horizontalHeaderHighlightSections">
-              <bool>false</bool>
-             </attribute>
              <attribute name="horizontalHeaderMinimumSectionSize">
               <number>50</number>
+             </attribute>
+             <attribute name="horizontalHeaderHighlightSections">
+              <bool>false</bool>
              </attribute>
              <attribute name="verticalHeaderVisible">
               <bool>false</bool>
@@ -927,7 +927,10 @@ QSlider::handle:horizontal:hover {
         </widget>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,1,0,0,0,0,0">
+         <property name="spacing">
+          <number>12</number>
+         </property>
          <item>
           <widget class="QCheckBox" name="chkTestMode">
            <property name="sizePolicy">
@@ -981,6 +984,12 @@ QSlider::handle:horizontal:hover {
          </item>
          <item>
           <widget class="QPushButton" name="cmdFileOpen">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="text">
             <string>Open</string>
            </property>
@@ -988,6 +997,12 @@ QSlider::handle:horizontal:hover {
          </item>
          <item>
           <widget class="QPushButton" name="cmdFileReset">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="text">
             <string>Reset</string>
            </property>
@@ -996,16 +1011,15 @@ QSlider::handle:horizontal:hover {
          <item>
           <widget class="QToolButton" name="cmdFileSend">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+            <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
-           <property name="baseSize">
-            <size>
-             <width>93</width>
-             <height>0</height>
-            </size>
+           <property name="font">
+            <font>
+             <pointsize>13</pointsize>
+            </font>
            </property>
            <property name="text">
             <string>Send</string>
@@ -1014,6 +1028,12 @@ QSlider::handle:horizontal:hover {
          </item>
          <item>
           <widget class="QPushButton" name="cmdFilePause">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="text">
             <string>Pause</string>
            </property>
@@ -1024,6 +1044,12 @@ QSlider::handle:horizontal:hover {
          </item>
          <item>
           <widget class="QPushButton" name="cmdFileAbort">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="text">
             <string>Abort</string>
            </property>
@@ -1540,9 +1566,9 @@ QSlider::handle:horizontal:hover {
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-416</y>
-            <width>228</width>
-            <height>691</height>
+            <y>0</y>
+            <width>243</width>
+            <height>736</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -2544,6 +2570,12 @@ QSlider::handle:horizontal:hover {
               <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="1,0,0">
                <item>
                 <widget class="ComboBox" name="cboCommand">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="styleSheet">
                   <string notr="true">padding-top: 3;
 padding-bottom: 3;
@@ -2565,6 +2597,12 @@ padding-right: 8;</string>
                </item>
                <item>
                 <widget class="QPushButton" name="cmdCommandSend">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="toolTip">
                   <string>Send command</string>
                  </property>
@@ -2582,6 +2620,12 @@ padding-right: 8;</string>
                </item>
                <item>
                 <widget class="QPushButton" name="cmdClearConsole">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="toolTip">
                   <string>Clear console</string>
                  </property>
@@ -2616,7 +2660,7 @@ padding-right: 8;</string>
      <x>0</x>
      <y>0</y>
      <width>952</width>
-     <height>26</height>
+     <height>34</height>
     </rect>
    </property>
    <widget class="QMenu" name="mnuFile">
@@ -2753,11 +2797,6 @@ padding-right: 8;</string>
  <tabstops>
   <tabstop>chkTestMode</tabstop>
   <tabstop>chkAutoScroll</tabstop>
-  <tabstop>cmdFileOpen</tabstop>
-  <tabstop>cmdFileReset</tabstop>
-  <tabstop>cmdFileSend</tabstop>
-  <tabstop>cmdFilePause</tabstop>
-  <tabstop>cmdFileAbort</tabstop>
   <tabstop>cmdTop</tabstop>
   <tabstop>cmdIsometric</tabstop>
   <tabstop>cmdFront</tabstop>

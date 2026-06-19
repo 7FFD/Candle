@@ -21,6 +21,9 @@
 
 #include <QFileDialog>
 #include <QTextStream>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
 #include <QDebug>
 #include <QStringList>
 #include <QTextBlock>
@@ -85,7 +88,17 @@ frmMain::frmMain(QWidget *parent) :
                        << "black";
 
     // Loading settings
-    m_settingsFileName = qApp->applicationDirPath() + "/settings.ini";
+    {
+        QString newDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir().mkpath(newDir);
+        
+        m_settingsFileName = newDir + "/settings.ini";
+
+        // Migrate settings from old location (next to executable) if not yet migrated
+        QString oldFile = qApp->applicationDirPath() + "/settings.ini";
+        if (!QFile::exists(m_settingsFileName) && QFile::exists(oldFile))
+            QFile::copy(oldFile, m_settingsFileName);
+    }
     preloadSettings();
 
     m_settings = new frmSettings(this);
@@ -328,12 +341,17 @@ void frmMain::preloadSettings()
 
 void frmMain::loadSettings()
 {
+    bool firstLaunch = !QFile::exists(m_settingsFileName);
+
     QSettings set(m_settingsFileName, QSettings::IniFormat);
     set.setIniCodec("UTF-8");
 
     m_settingsLoading = true;
 
-    m_settings->setFontSize(set.value("fontSize", 8).toInt());
+    if (firstLaunch)
+        m_settings->resetToDefaults();
+
+    m_settings->setFontSize(set.value("fontSize", m_settings->fontSize()).toInt());
     m_settings->setPort(set.value("port").toString());
     m_settings->setBaud(set.value("baud").toInt());
     m_settings->setIgnoreErrors(set.value("ignoreErrors", false).toBool());
@@ -404,7 +422,7 @@ void frmMain::loadSettings()
     m_recentHeightmaps = set.value("recentHeightmaps", QStringList()).toStringList();
     m_lastFolder = set.value("lastFolder", QDir::homePath()).toString();
 
-    this->restoreGeometry(set.value("formGeometry", QByteArray()).toByteArray());
+    m_storedGeometry = set.value("formGeometry", QByteArray()).toByteArray();
     m_settings->resize(set.value("formSettingsSize", m_settings->size()).toSize());
     QByteArray splitterState = set.value("splitter", QByteArray()).toByteArray();
 
@@ -454,7 +472,8 @@ void frmMain::loadSettings()
     ui->chkHeightMapInterpolationShow->setChecked(set.value("heightmapInterpolationShow", false).toBool());
 
     foreach (ColorPicker* pick, m_settings->colors()) {
-        pick->setColor(QColor(set.value(pick->objectName().mid(3), "black").toString()));
+        QString key = pick->objectName().mid(3);
+        pick->setColor(QColor(set.value(key, pick->color().name()).toString()));
     }
 
     updateRecentFilesMenu();
@@ -463,8 +482,6 @@ void frmMain::loadSettings()
 
     // Update right panel width
     applySettings();
-    show();
-    ui->scrollArea->updateMinimumWidth();
 
     // Restore panels state
     ui->grpUserCommands->setChecked(set.value("userCommandsPanel", true).toBool());
@@ -478,6 +495,9 @@ void frmMain::loadSettings()
     ui->cboCommand->setCurrentIndex(-1);
 
     m_settingsLoading = false;
+
+    show();
+    ui->scrollArea->updateMinimumWidth();
 }
 
 void frmMain::saveSettings()
@@ -1437,6 +1457,9 @@ void frmMain::showEvent(QShowEvent *se)
 {
     Q_UNUSED(se)
 
+    if (!m_storedGeometry.isEmpty())
+        restoreGeometry(m_storedGeometry);
+
     placeVisualizerButtons();
 
 #ifdef WINDOWS
@@ -1451,6 +1474,18 @@ void frmMain::showEvent(QShowEvent *se)
 
     ui->glwVisualizer->setUpdatesEnabled(true);
 
+    resizeCheckBoxes();
+
+    QTimer::singleShot(50, this, SLOT(forceRepaint()));
+}
+
+void frmMain::forceRepaint()
+{
+    m_forceRepaintInProgress = true;
+    QSize s = size();
+    resize(s.width() + 1, s.height());
+    resize(s.width(), s.height());
+    m_forceRepaintInProgress = false;
     resizeCheckBoxes();
 }
 
@@ -1481,6 +1516,8 @@ void frmMain::resizeTableHeightMapSections()
 
 void frmMain::resizeCheckBoxes()
 {
+    if (m_forceRepaintInProgress) return;
+
     static int widthCheckMode = ui->chkTestMode->sizeHint().width();
     static int widthAutoScroll = ui->chkAutoScroll->sizeHint().width();
 
@@ -1548,6 +1585,8 @@ void frmMain::closeEvent(QCloseEvent *ce)
         m_heightMapMode = mode;
         return;
     }
+
+    saveSettings();
 
     if (m_serialPort.isOpen()) m_serialPort.close();
     if (m_queue.length() > 0) {

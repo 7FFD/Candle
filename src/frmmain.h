@@ -88,6 +88,7 @@ public:
 private slots:
     void updateHeightMapInterpolationDrawer(bool reset = false);
     void placeVisualizerButtons();
+    void forceRepaint();
 
     void onSerialPortReadyRead();
     void onSerialPortError(QSerialPort::SerialPortError);
@@ -241,8 +242,11 @@ private:
     QString m_heightMapFileName;
     QString m_lastFolder;
 
+    QByteArray m_storedGeometry;
+
     bool m_fileChanged = false;
     bool m_heightMapChanged = false;
+    bool m_forceRepaintInProgress = false;
 
     QTimer m_timerConnection;
     QTimer m_timerStateQuery;
