@@ -39,6 +39,7 @@ TRANSLATIONS += translations/candle_en.ts translations/candle_ru.ts translations
 
 SOURCES += main.cpp\
         frmmain.cpp \
+    grblserial.cpp \
     frmsettings.cpp \
     frmabout.cpp \
     drawers/gcodedrawer.cpp \
@@ -69,6 +70,7 @@ SOURCES += main.cpp\
     widgets/comboboxkey.cpp
 
 HEADERS  += frmmain.h \
+    grblserial.h \
     frmsettings.h \
     frmabout.h \
     drawers/gcodedrawer.h \

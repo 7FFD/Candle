@@ -5,9 +5,7 @@
 #define FRMMAIN_H
 
 #include <QMainWindow>
-#include <QtSerialPort/QSerialPort>
 #include <QSettings>
-#include <QTimer>
 #include <QBasicTimer>
 #include <QStringList>
 #include <QList>
@@ -17,6 +15,8 @@
 #include <QDropEvent>
 #include <QProgressDialog>
 #include <exception>
+
+#include "grblserial.h"
 
 #include "parser/gcodeviewparse.h"
 
@@ -49,19 +49,6 @@ namespace Ui {
 class frmMain;
 }
 
-struct CommandAttributes {
-    int length;
-    int consoleIndex;
-    int tableIndex;
-    QString command;
-};
-
-struct CommandQueue {
-    QString command;
-    int tableIndex;
-    bool showInConsole;
-};
-
 class CancelException : public std::exception {
 public:
 #ifdef Q_OS_MAC
@@ -90,10 +77,12 @@ private slots:
     void placeVisualizerButtons();
     void forceRepaint();
 
-    void onSerialPortReadyRead();
-    void onSerialPortError(QSerialPort::SerialPortError);
-    void onTimerConnection();
-    void onTimerStateQuery();
+    void onGrblStatus(GrblStatus status);
+    void onCommandAcknowledged(CommandAttributes ca, QString response);
+    void onFloatingResponse(QString data);
+    void onHardwareReset();
+    void onPortOpened();
+    void onConnectionError(QSerialPort::SerialPortError error, QString message);
     void onVisualizatorRotationChanged();
     void onScroolBarAction(int action);
     void onJogTimer();
@@ -204,8 +193,6 @@ protected:
     void dropEvent(QDropEvent *de);
 
 private:
-    const int BUFFERLENGTH = 127;
-
     Ui::frmMain *ui;
     GcodeViewParse m_viewParser;
     GcodeViewParse m_probeParser;
@@ -232,7 +219,7 @@ private:
     bool m_programLoading;
     bool m_settingsLoading;
 
-    QSerialPort m_serialPort;
+    GrblSerial *m_grblSerial;
 
     frmSettings *m_settings;
     frmAbout m_frmAbout;
@@ -248,11 +235,9 @@ private:
     bool m_heightMapChanged = false;
     bool m_forceRepaintInProgress = false;
 
-    QTimer m_timerConnection;
-    QTimer m_timerStateQuery;
     QBasicTimer m_timerToolAnimation;
 
-    QStringList m_status;
+    // Status display strings (indexed by GrblMachineStatus)
     QStringList m_statusCaptions;
     QStringList m_statusBackColors;
     QStringList m_statusForeColors;
@@ -263,8 +248,6 @@ private:
 #endif
 
     QMenu *m_tableMenu;
-    QList<CommandAttributes> m_commands;
-    QList<CommandQueue> m_queue;
     QTime m_startTime;
 
     QMessageBox* m_senderErrorBox;
@@ -283,15 +266,9 @@ private:
     // Flags
     bool m_settingZeroXY = false;
     bool m_settingZeroZ = false;
-    bool m_homing = false;
-    bool m_updateSpindleSpeed = false;
-    bool m_updateParserStatus = false;
     bool m_updateFeed = false;
 
-    bool m_reseting = false;
-    bool m_resetCompleted = true;
     bool m_aborting = false;
-    bool m_statusReceived = false;
 
     bool m_processingFile = false;
     bool m_transferCompleted = false;
@@ -334,16 +311,11 @@ private:
     void saveSettings();
     bool saveChanges(bool heightMapMode);
     void updateControlsState();
-    void openPort();
     void sendCommand(QString command, int tableIndex = -1, bool showInConsole = true);
     void grblReset();
-    int bufferLength();
     void sendNextFileCommands();
     void applySettings();
     void updateParser();
-    bool dataIsFloating(QString data);
-    bool dataIsEnd(QString data);
-    bool dataIsReset(QString data);
 
     QTime updateProgramEstimatedTime(QList<LineSegment *> lines);
     bool saveProgramToFile(QString fileName, GCodeTableModel *model);

@@ -6,6 +6,8 @@ project(Candle)
 # instruct CMake to run moc automatically when needed
 set(CMAKE_AUTOMOC ON)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # create code from a list of Qt designer ui files
 set(CMAKE_AUTOUIC ON)
 
@@ -26,6 +28,7 @@ find_package(Qt5 COMPONENTS Core Widgets OpenGL SerialPort REQUIRED)
 include_directories(${PROJECT_SOURCE_DIR})
 
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/*.cpp
+                    ${PROJECT_SOURCE_DIR}/*.h
                     ${PROJECT_SOURCE_DIR}/drawers/*.cpp
                     ${PROJECT_SOURCE_DIR}/parser/*.cpp
                     ${PROJECT_SOURCE_DIR}/widgets/*.cpp
