@@ -35,6 +35,8 @@
 #include <QAction>
 #include <QLayout>
 #include <QMimeData>
+#include <QRegularExpression>
+#include <QSurfaceFormat>
 #include "frmmain.h"
 #include "ui_frmmain.h"
 
@@ -153,7 +155,7 @@ frmMain::frmMain(QWidget *parent) :
 
     connect(ui->cboCommand, SIGNAL(returnPressed()), this, SLOT(onCboCommandReturnPressed()));
 
-    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegExp("cmdUser\\d"))) {
+    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegularExpression("cmdUser\\d"))) {
         connect(button, SIGNAL(clicked(bool)), this, SLOT(onCmdUserClicked(bool)));
     }
 
@@ -252,7 +254,7 @@ frmMain::frmMain(QWidget *parent) :
     updateControlsState();
 
     // Prepare jog buttons
-    foreach (StyledToolButton* button, ui->grpJog->findChildren<StyledToolButton*>(QRegExp("cmdJogFeed\\d")))
+    foreach (StyledToolButton* button, ui->grpJog->findChildren<StyledToolButton*>(QRegularExpression("cmdJogFeed\\d")))
     {
         connect(button, SIGNAL(clicked(bool)), this, SLOT(onCmdJogFeedClicked()));
     }
@@ -329,14 +331,10 @@ double frmMain::toolZPosition()
 void frmMain::preloadSettings()
 {
     QSettings set(m_settingsFileName, QSettings::IniFormat);
-    set.setIniCodec("UTF-8");
 
-    qApp->setStyleSheet(QString(qApp->styleSheet()).replace(QRegExp("font-size:\\s*\\d+"), "font-size: " + set.value("fontSize", "8").toString()));
+    qApp->setStyleSheet(QString(qApp->styleSheet()).replace(QRegularExpression("font-size:\\s*\\d+"), "font-size: " + set.value("fontSize", "8").toString()));
 
-    // Update v-sync in glformat
-    QGLFormat fmt = QGLFormat::defaultFormat();
-    fmt.setSwapInterval(set.value("vsync", false).toBool() ? 1 : 0);
-    QGLFormat::setDefaultFormat(fmt);
+    // V-sync swap interval is set via QSurfaceFormat at startup (in main.cpp)
 }
 
 void frmMain::loadSettings()
@@ -344,7 +342,6 @@ void frmMain::loadSettings()
     bool firstLaunch = !QFile::exists(m_settingsFileName);
 
     QSettings set(m_settingsFileName, QSettings::IniFormat);
-    set.setIniCodec("UTF-8");
 
     m_settingsLoading = true;
 
@@ -444,7 +441,7 @@ void frmMain::loadSettings()
     m_settings->setTouchCommand(set.value("touchCommand").toString());
     m_settings->setSafePositionCommand(set.value("safePositionCommand").toString());
 
-    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegExp("cmdUser\\d"))) {
+    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegularExpression("cmdUser\\d"))) {
         int i = button->objectName().right(1).toInt();
         m_settings->setUserCommands(i, set.value(QString("userCommands%1").arg(i)).toString());
     }
@@ -503,7 +500,6 @@ void frmMain::loadSettings()
 void frmMain::saveSettings()
 {
     QSettings set(m_settingsFileName, QSettings::IniFormat);
-    set.setIniCodec("UTF-8");
 
     set.setValue("port", m_settings->port());
     set.setValue("baud", m_settings->baud());
@@ -577,7 +573,7 @@ void frmMain::saveSettings()
     set.setValue("spindleOverride", ui->slbSpindleOverride->isChecked());
     set.setValue("spindleOverrideValue", ui->slbSpindleOverride->value());
 
-    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegExp("cmdUser\\d"))) {
+    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegularExpression("cmdUser\\d"))) {
         int i = button->objectName().right(1).toInt();
         set.setValue(QString("userCommands%1").arg(i), m_settings->userCommands(i));
     }
@@ -794,16 +790,17 @@ void frmMain::sendCommand(QString command, int tableIndex, bool showInConsole)
     m_commands.append(ca);
 
     // Processing spindle speed only from g-code program
-    QRegExp s("[Ss]0*(\\d+)");
-    if (s.indexIn(command) != -1 && ca.tableIndex > -2) {
-        int speed = s.cap(1).toInt();
+    QRegularExpression s("[Ss]0*(\\d+)");
+    QRegularExpressionMatch sm = s.match(command);
+    if (sm.hasMatch() && ca.tableIndex > -2) {
+        int speed = sm.captured(1).toInt();
         if (ui->slbSpindle->value() != speed) {
             ui->slbSpindle->setValue(speed);
         }
     }
 
     // Set M2 & M30 commands sent flag
-    if (command.contains(QRegExp("M0*2|M30"))) {
+    if (command.contains(QRegularExpression("M0*2|M30"))) {
         m_fileEndSent = true;
     }
 
@@ -877,17 +874,19 @@ void frmMain::onSerialPortReadyRead()
             m_statusReceived = true;
 
             // Update machine coordinates
-            static QRegExp mpx("MPos:([^,]*),([^,]*),([^,^>^|]*)");
-            if (mpx.indexIn(data) != -1) {
-                ui->txtMPosX->setText(mpx.cap(1));
-                ui->txtMPosY->setText(mpx.cap(2));
-                ui->txtMPosZ->setText(mpx.cap(3));
+            static QRegularExpression mpx("MPos:([^,]*),([^,]*),([^,>|]*)");
+            QRegularExpressionMatch mpxm = mpx.match(data);
+            if (mpxm.hasMatch()) {
+                ui->txtMPosX->setText(mpxm.captured(1));
+                ui->txtMPosY->setText(mpxm.captured(2));
+                ui->txtMPosZ->setText(mpxm.captured(3));
             }
 
             // Status
-            static QRegExp stx("<([^,^>^|]*)");
-            if (stx.indexIn(data) != -1) {
-                status = m_status.indexOf(stx.cap(1));
+            static QRegularExpression stx("<([^,>|]*)");
+            QRegularExpressionMatch stxm = stx.match(data);
+            if (stxm.hasMatch()) {
+                status = m_status.indexOf(stxm.captured(1));
 
                 // Undetermined status
                 if (status == -1) status = 0;
@@ -993,11 +992,11 @@ void frmMain::onSerialPortReadyRead()
 
             // Store work offset
             static QVector3D workOffset;
-            static QRegExp wpx("WCO:([^,]*),([^,]*),([^,^>^|]*)");
-
-            if (wpx.indexIn(data) != -1)
+            static QRegularExpression wpx("WCO:([^,]*),([^,]*),([^,>|]*)");
+            QRegularExpressionMatch wpxm = wpx.match(data);
+            if (wpxm.hasMatch())
             {
-                workOffset = QVector3D(wpx.cap(1).toDouble(), wpx.cap(2).toDouble(), wpx.cap(3).toDouble());
+                workOffset = QVector3D(wpxm.captured(1).toDouble(), wpxm.captured(2).toDouble(), wpxm.captured(3).toDouble());
             }
 
             // Update work coordinates
@@ -1049,13 +1048,14 @@ void frmMain::onSerialPortReadyRead()
             }
 
             // Get overridings
-            static QRegExp ov("Ov:([^,]*),([^,]*),([^,^>^|]*)");
-            if (ov.indexIn(data) != -1)
-            {                
-                updateOverride(ui->slbFeedOverride, ov.cap(1).toInt(), 0x91);
-                updateOverride(ui->slbSpindleOverride, ov.cap(3).toInt(), 0x9a);
+            static QRegularExpression ov("Ov:([^,]*),([^,]*),([^,>|]*)");
+            QRegularExpressionMatch ovm = ov.match(data);
+            if (ovm.hasMatch())
+            {
+                updateOverride(ui->slbFeedOverride, ovm.captured(1).toInt(), 0x91);
+                updateOverride(ui->slbSpindleOverride, ovm.captured(3).toInt(), 0x9a);
 
-                int rapid = ov.cap(2).toInt();
+                int rapid = ovm.captured(2).toInt();
                 ui->slbRapidOverride->setCurrentValue(rapid);
 
                 int target = ui->slbRapidOverride->isChecked() ? ui->slbRapidOverride->value() : 100;
@@ -1074,15 +1074,17 @@ void frmMain::onSerialPortReadyRead()
 
                 // Update pins state
                 QString pinState;
-                static QRegExp pn("Pn:([^|^>]*)");
-                if (pn.indexIn(data) != -1) {
-                    pinState.append(QString(tr("PS: %1")).arg(pn.cap(1)));
+                static QRegularExpression pn("Pn:([^|>]*)");
+                QRegularExpressionMatch pnm = pn.match(data);
+                if (pnm.hasMatch()) {
+                    pinState.append(QString(tr("PS: %1")).arg(pnm.captured(1)));
                 }
 
                 // Process spindle state
-                static QRegExp as("A:([^,^>^|]+)");
-                if (as.indexIn(data) != -1) {
-                    QString state = as.cap(1);
+                static QRegularExpression as("A:([^,>|]+)");
+                QRegularExpressionMatch asm_ = as.match(data);
+                if (asm_.hasMatch()) {
+                    QString state = asm_.captured(1);
                     m_spindleCW = state.contains("S");
                     if (state.contains("S") || state.contains("C")) {
                         m_timerToolAnimation.start(25, this);
@@ -1093,7 +1095,7 @@ void frmMain::onSerialPortReadyRead()
                     }
 
                     if (!pinState.isEmpty()) pinState.append(" / ");
-                    pinState.append(QString(tr("AS: %1")).arg(as.cap(1)));
+                    pinState.append(QString(tr("AS: %1")).arg(asm_.captured(1)));
                 } else {
                     m_timerToolAnimation.stop();
                     ui->cmdSpindle->setChecked(false);
@@ -1102,9 +1104,10 @@ void frmMain::onSerialPortReadyRead()
             }
 
             // Get feed/spindle values
-            static QRegExp fs("FS:([^,]*),([^,^|^>]*)");            
-            if (fs.indexIn(data) != -1) {
-                ui->glwVisualizer->setSpeedState((QString(tr("F/S: %1 / %2")).arg(fs.cap(1)).arg(fs.cap(2))));
+            static QRegularExpression fs("FS:([^,]*),([^,|>]*)");
+            QRegularExpressionMatch fsm = fs.match(data);
+            if (fsm.hasMatch()) {
+                ui->glwVisualizer->setSpeedState((QString(tr("F/S: %1 / %2")).arg(fsm.captured(1)).arg(fsm.captured(2))));
             }
 
         } else if (data.length() > 0) {
@@ -1145,9 +1148,10 @@ void frmMain::onSerialPortReadyRead()
                         if (m_processingFile) storeParserState();
 
                         // Spindle speed
-                        QRegExp rx(".*S([\\d\\.]+)");
-                        if (rx.indexIn(response) != -1) {
-                            double speed = toMetric(rx.cap(1).toDouble()); //RPM in imperial?
+                        QRegularExpression rx(".*S([\\d\\.]+)");
+                        QRegularExpressionMatch rxm = rx.match(response);
+                        if (rxm.hasMatch()) {
+                            double speed = toMetric(rxm.captured(1).toDouble()); //RPM in imperial?
                             ui->slbSpindle->setCurrentValue(speed);
                         }
 
@@ -1157,16 +1161,16 @@ void frmMain::onSerialPortReadyRead()
                     // Store origin
                     if (ca.command == "$#" && ca.tableIndex == -2) {
                         qDebug() << "Received offsets:" << response;
-                        QRegExp rx(".*G92:([^,]*),([^,]*),([^\\]]*)");
-
-                        if (rx.indexIn(response) != -1) {
+                        QRegularExpression rx(".*G92:([^,]*),([^,]*),([^\\]]*)");
+                        QRegularExpressionMatch rxm = rx.match(response);
+                        if (rxm.hasMatch()) {
                             if (m_settingZeroXY) {
                                 m_settingZeroXY = false;
-                                m_storedX = toMetric(rx.cap(1).toDouble());
-                                m_storedY = toMetric(rx.cap(2).toDouble());
+                                m_storedX = toMetric(rxm.captured(1).toDouble());
+                                m_storedY = toMetric(rxm.captured(2).toDouble());
                             } else if (m_settingZeroZ) {
                                 m_settingZeroZ = false;
-                                m_storedZ = toMetric(rx.cap(3).toDouble());
+                                m_storedZ = toMetric(rxm.captured(3).toDouble());
                             }
                             ui->cmdRestoreOrigin->setToolTip(QString(tr("Restore origin:\n%1, %2, %3")).arg(m_storedX).arg(m_storedY).arg(m_storedZ));
                         }
@@ -1191,11 +1195,12 @@ void frmMain::onSerialPortReadyRead()
                     if (ca.command.contains("G38.2") && m_heightMapMode && ca.tableIndex > -1) {
                         // Get probe Z coordinate
                         // "[PRB:0.000,0.000,0.000:0];ok"
-                        QRegExp rx(".*PRB:([^,]*),([^,]*),([^]^:]*)");
+                        QRegularExpression rx(".*PRB:([^,]*),([^,]*),([^:,\\]]+)");
                         double z = qQNaN();
-                        if (rx.indexIn(response) != -1) {
-                            qDebug() << "probing coordinates:" << rx.cap(1) << rx.cap(2) << rx.cap(3);
-                            z = toMetric(rx.cap(3).toDouble());
+                        QRegularExpressionMatch rxm = rx.match(response);
+                        if (rxm.hasMatch()) {
+                            qDebug() << "probing coordinates:" << rxm.captured(1) << rxm.captured(2) << rxm.captured(3);
+                            z = toMetric(rxm.captured(3).toDouble());
                         }
 
                         static double firstZ;
@@ -1221,7 +1226,7 @@ void frmMain::onSerialPortReadyRead()
                     }
 
                     // Change state query time on check mode on
-                    if (ca.command.contains(QRegExp("$[cC]"))) {
+                    if (ca.command.contains(QRegularExpression("\\$[cC]"))) {
                         m_timerStateQuery.setInterval(response.contains("Enable") ? 1000 : m_settings->queryStateTime());
                     }
 
@@ -1305,7 +1310,7 @@ void frmMain::onSerialPortReadyRead()
 
                         // Check transfer complete (last row always blank, last command row = rowcount - 2)
                         if (m_fileProcessedCommandIndex == m_currentModel->rowCount() - 2
-                                || ca.command.contains(QRegExp("M0*2|M30"))) m_transferCompleted = true;
+                                || ca.command.contains(QRegularExpression("M0*2|M30"))) m_transferCompleted = true;
                         // Send next program commands
                         else if (!m_fileEndSent && (m_fileCommandIndex < m_currentModel->rowCount()) && !holding) sendNextFileCommands();
                     }
@@ -1650,7 +1655,7 @@ void frmMain::on_cmdFileOpen_clicked()
         QString fileName  = QFileDialog::getOpenFileName(this, tr("Open"), m_lastFolder,
                                    tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt);;All files (*.*)"));
 
-        if (!fileName.isEmpty()) m_lastFolder = fileName.left(fileName.lastIndexOf(QRegExp("[/\\\\]+")));
+        if (!fileName.isEmpty()) m_lastFolder = fileName.left(fileName.lastIndexOf(QRegularExpression("[/\\\\]+")));
 
         if (fileName != "") {
             addRecentFile(fileName);
@@ -1687,7 +1692,7 @@ void frmMain::resetHeightmap()
 
 void frmMain::loadFile(QList<QString> data)
 {
-    QTime time;
+    QElapsedTimer time;
     time.start();
 
     // Reset tables
@@ -2031,7 +2036,7 @@ void frmMain::on_cmdFileAbort_clicked()
 void frmMain::storeParserState()
 {    
     m_storedParserStatus = ui->glwVisualizer->parserStatus().remove(
-                QRegExp("GC:|\\[|\\]|G[01234]\\s|M[0345]+\\s|\\sF[\\d\\.]+|\\sS[\\d\\.]+"));
+                QRegularExpression("GC:|\\[|\\]|G[01234]\\s|M[0345]+\\s|\\sF[\\d\\.]+|\\sS[\\d\\.]+"));
 }
 
 void frmMain::restoreParserState()
@@ -2062,7 +2067,7 @@ void frmMain::sendNextFileCommands() {
 
     while ((bufferLength() + command.length() + 1) <= BUFFERLENGTH
            && m_fileCommandIndex < m_currentModel->rowCount() - 1
-           && !(!m_commands.isEmpty() && m_commands.last().command.contains(QRegExp("M0*2|M30")))) {
+           && !(!m_commands.isEmpty() && m_commands.last().command.contains(QRegularExpression("M0*2|M30")))) {
         m_currentModel->setData(m_currentModel->index(m_fileCommandIndex, 2), GCodeItem::Sent);
         sendCommand(command, m_fileCommandIndex, m_settings->showProgramCommands());
         m_fileCommandIndex++;
@@ -2257,7 +2262,6 @@ void frmMain::applySettings() {
     ui->grpOverriding->setVisible(m_settings->panelOverriding());
     ui->grpJog->setVisible(m_settings->panelJog());
 
-    ui->cboCommand->setAutoCompletion(m_settings->autoCompletion());
 
     m_codeDrawer->setSimplify(m_settings->simplify());
     m_codeDrawer->setSimplifyPrecision(m_settings->simplifyPrecision());
@@ -2312,7 +2316,7 @@ void frmMain::applySettings() {
     ui->cmdClearConsole->setFixedHeight(ui->cboCommand->height());
     ui->cmdCommandSend->setFixedHeight(ui->cboCommand->height());
 
-    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegExp("cmdUser\\d"))) {
+    foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegularExpression("cmdUser\\d"))) {
         button->setToolTip(m_settings->userCommands(button->objectName().right(1).toInt()));
         button->setEnabled(!button->toolTip().isEmpty());
     }
@@ -2320,7 +2324,7 @@ void frmMain::applySettings() {
 
 void frmMain::updateParser()
 {
-    QTime time;
+    QElapsedTimer time;
 
     qDebug() << "updating parser:" << m_currentModel << m_currentDrawer;
     time.start();
@@ -2522,7 +2526,7 @@ void frmMain::on_cmdFileReset_clicked()
     m_probeIndex = -1;
 
     if (!m_heightMapMode) {
-        QTime time;
+        QElapsedTimer time;
 
         time.start();
 
@@ -2771,7 +2775,7 @@ bool frmMain::dataIsFloating(QString data) {
 }
 
 bool frmMain::dataIsReset(QString data) {
-    return QRegExp("^GRBL|GCARVIN\\s\\d\\.\\d.").indexIn(data.toUpper()) != -1;
+    return QRegularExpression("^GRBL|GCARVIN\\s\\d\\.\\d.").match(data.toUpper()).hasMatch();
 }
 
 QString frmMain::feedOverride(QString command)
@@ -2934,7 +2938,7 @@ bool frmMain::eventFilter(QObject *obj, QEvent *event)
 int frmMain::getConsoleMinHeight()
 {
     return ui->grpConsole->height() - ui->grpConsole->contentsRect().height()
-            + ui->spacerConsole->geometry().height() + ui->grpConsole->layout()->margin() * 2
+            + ui->spacerConsole->geometry().height() + ui->grpConsole->layout()->contentsMargins().top() * 2
             + ui->cboCommand->height();
 }
 
@@ -3564,7 +3568,7 @@ void frmMain::on_chkHeightMapUse_clicked(bool checked)
         progress.setStyleSheet("QProgressBar {text-align: center; qproperty-format: \"\"}");
 
         // Performance test
-        QTime time;
+        QElapsedTimer time;
 
         // Store fileChanged state
 //        fileChanged = m_fileChanged;

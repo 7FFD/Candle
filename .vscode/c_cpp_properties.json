@@ -1,0 +1,31 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "compileCommands": "${workspaceFolder}/build-macosx/compile_commands.json",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/build-macosx/Candle_autogen/include",
+                "/opt/homebrew/opt/qt6/include",
+                "/opt/homebrew/opt/qt6/include/QtCore",
+                "/opt/homebrew/opt/qt6/include/QtWidgets",
+                "/opt/homebrew/opt/qt6/include/QtGui",
+                "/opt/homebrew/opt/qt6/include/QtSerialPort",
+                "/opt/homebrew/opt/qt6/include/QtOpenGL",
+                "/opt/homebrew/opt/qt6/include/QtOpenGLWidgets"
+            ],
+            "defines": [
+                "QT_CORE_LIB",
+                "QT_GUI_LIB",
+                "QT_WIDGETS_LIB",
+                "QT_OPENGL_LIB",
+                "QT_SERIALPORT_LIB",
+                "Q_OS_MAC"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64"
+        }
+    ],
+    "version": 4
+}

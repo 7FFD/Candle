@@ -18,7 +18,7 @@ bool StyledToolButton::isHover()
     return m_hovered;
 }
 
-void StyledToolButton::enterEvent(QEvent *e)
+void StyledToolButton::enterEvent(QEnterEvent *e)
 {
     Q_UNUSED(e)
 
@@ -42,7 +42,6 @@ void StyledToolButton::paintEvent(QPaintEvent *e)
     QPainter painter(this);
 
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setRenderHint(QPainter::HighQualityAntialiasing);
 
     // Highlight
     QPen highlightPen;

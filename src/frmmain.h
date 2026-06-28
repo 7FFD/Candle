@@ -12,6 +12,7 @@
 #include <QStringList>
 #include <QList>
 #include <QTime>
+#include <QElapsedTimer>
 #include <QMenu>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -265,7 +266,7 @@ private:
     QMenu *m_tableMenu;
     QList<CommandAttributes> m_commands;
     QList<CommandQueue> m_queue;
-    QTime m_startTime;
+    QElapsedTimer m_startTime;
 
     QMessageBox* m_senderErrorBox;
 

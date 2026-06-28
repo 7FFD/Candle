@@ -12,6 +12,7 @@
 
 class StyledToolButton : public QAbstractButton
 {
+    Q_OBJECT
 public:
     explicit StyledToolButton(QWidget *parent = 0);
 
@@ -27,7 +28,7 @@ public:
     void setHighlightColor(const QColor &highlightColor);
 
 protected:
-    void enterEvent(QEvent *);
+    void enterEvent(QEnterEvent *);
     void leaveEvent(QEvent *);
 
 private:

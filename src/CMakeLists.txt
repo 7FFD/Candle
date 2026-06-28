@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.16)
 project(Candle)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -6,8 +6,13 @@ project(Candle)
 # instruct CMake to run moc automatically when needed
 set(CMAKE_AUTOMOC ON)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # create code from a list of Qt designer ui files
 set(CMAKE_AUTOUIC ON)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W")
@@ -21,7 +26,7 @@ endif()
 add_compile_definitions(APP_VERSION="1.1.9")
 add_compile_definitions(QT_NO_DEBUG)
 
-find_package(Qt5 COMPONENTS Core Widgets OpenGL SerialPort REQUIRED)
+find_package(Qt6 COMPONENTS Core Gui Widgets OpenGL OpenGLWidgets SerialPort REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -32,7 +37,7 @@ file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/*.cpp
                     ${PROJECT_SOURCE_DIR}/tables/*.cpp
                     )
 
-qt5_add_resources(SHADER_RSC 
+qt_add_resources(SHADER_RSC
     ${PROJECT_SOURCE_DIR}/shaders.qrc
     ${PROJECT_SOURCE_DIR}/images.qrc
     ${PROJECT_SOURCE_DIR}/fonts.qrc
@@ -41,7 +46,7 @@ qt5_add_resources(SHADER_RSC
 if(APPLE)
     # If we switch to automatic PList generation
     set(MACOSX_BUNDLE_ICON_FILE candle.icns)
-    
+
 
     set(MACOSX_BUNDLE_ICON_LOCATION ${PROJECT_SOURCE_DIR}/candle.icns)
     set_source_files_properties(${MACOSX_BUNDLE_ICON_LOCATION} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
@@ -53,9 +58,10 @@ else()
 endif()
 
 target_link_libraries(Candle
-    Qt5::Core
-    Qt5::Widgets
-    Qt5::OpenGL
-    Qt5::Gui
-    Qt5::SerialPort
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    Qt6::SerialPort
     )

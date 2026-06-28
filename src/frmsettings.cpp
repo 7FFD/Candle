@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QScrollBar>
 #include <QColorDialog>
+#include <QRegularExpression>
 
 frmSettings::frmSettings(QWidget *parent) :
     QDialog(parent),
@@ -695,7 +696,7 @@ void frmSettings::on_cmdDefaults_clicked()
 
 void frmSettings::on_cboFontSize_currentTextChanged(const QString &arg1)
 {
-    qApp->setStyleSheet(QString(qApp->styleSheet()).replace(QRegExp("font-size:\\s*\\d+"), "font-size: " + arg1));
+    qApp->setStyleSheet(QString(qApp->styleSheet()).replace(QRegularExpression("font-size:\\s*\\d+"), "font-size: " + arg1));
 }
 
 void frmSettings::on_radDrawModeVectors_toggled(bool checked)

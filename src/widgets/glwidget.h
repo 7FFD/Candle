@@ -4,21 +4,14 @@
 #ifndef GLWIDGET_H
 #define GLWIDGET_H
 
-#ifndef GLES
-#include <QGLWidget>
-#else
 #include <QOpenGLWidget>
-#endif
+#include <QOpenGLFunctions>
 
 #include <QTimer>
 #include <QTime>
 #include "drawers/shaderdrawable.h"
 
-#ifdef GLES
-class GLWidget : public QOpenGLWidget
-#else
-class GLWidget : public QGLWidget, protected QOpenGLFunctions
-#endif
+class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
     Q_OBJECT
 public:
@@ -138,11 +131,7 @@ protected:
     void resizeGL(int width, int height);
     void updateProjection();
     void updateView();
-#ifdef GLES
-    void paintGL();
-#else
     void paintEvent(QPaintEvent *pe);
-#endif
 
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
