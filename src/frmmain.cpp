@@ -223,6 +223,9 @@ frmMain::frmMain(QWidget *parent) :
                                        QMessageBox::Ignore | QMessageBox::Abort, this);
     m_senderErrorBox->setCheckBox(new QCheckBox(tr("Don't show again")));
 
+    // File manager (must be before loadSettings which calls m_fileManager->loadSettings)
+    m_fileManager = new FileManager(this);
+
     // Setup serial communication layer (must be before loadSettings/applySettings which call setQueryInterval)
     m_grblSerial = new GrblSerial(m_settings, this);
     m_grblSerial->setConsoleAppender([this](const QString &cmd) -> int {
@@ -274,7 +277,7 @@ frmMain::frmMain(QWidget *parent) :
     ui->splitPanels->installEventFilter(this);
 
     // Handle file drop
-    if (qApp->arguments().count() > 1 && isGCodeFile(qApp->arguments().last())) {
+    if (qApp->arguments().count() > 1 && FileManager::isGCodeFile(qApp->arguments().last())) {
         loadFile(qApp->arguments().last());
     }
 }
@@ -287,19 +290,6 @@ frmMain::~frmMain()
     delete ui;
 }
 
-bool frmMain::isGCodeFile(QString fileName)
-{
-    return fileName.endsWith(".txt", Qt::CaseInsensitive)
-          || fileName.endsWith(".nc", Qt::CaseInsensitive)
-          || fileName.endsWith(".ncc", Qt::CaseInsensitive)
-          || fileName.endsWith(".ngc", Qt::CaseInsensitive)
-          || fileName.endsWith(".tap", Qt::CaseInsensitive);
-}
-
-bool frmMain::isHeightmapFile(QString fileName)
-{
-    return fileName.endsWith(".map", Qt::CaseInsensitive);
-}
 
 double frmMain::toolZPosition()
 {
@@ -398,9 +388,7 @@ void frmMain::loadSettings()
 
     ui->cmdRestoreOrigin->setToolTip(QString(tr("Restore origin:\n%1, %2, %3")).arg(m_storedX).arg(m_storedY).arg(m_storedZ));
 
-    m_recentFiles = set.value("recentFiles", QStringList()).toStringList();
-    m_recentHeightmaps = set.value("recentHeightmaps", QStringList()).toStringList();
-    m_lastFolder = set.value("lastFolder", QDir::homePath()).toString();
+    m_fileManager->loadSettings(set);
 
     m_storedGeometry = set.value("formGeometry", QByteArray()).toByteArray();
     m_settings->resize(set.value("formSettingsSize", m_settings->size()).toSize());
@@ -537,9 +525,7 @@ void frmMain::saveSettings()
     set.setValue("storedX", m_storedX);
     set.setValue("storedY", m_storedY);
     set.setValue("storedZ", m_storedZ);
-    set.setValue("recentFiles", m_recentFiles);
-    set.setValue("recentHeightmaps", m_recentHeightmaps);
-    set.setValue("lastFolder", m_lastFolder);
+    m_fileManager->saveSettings(set);
     set.setValue("touchCommand", m_settings->touchCommand());
     set.setValue("safePositionCommand", m_settings->safePositionCommand());
     set.setValue("panelUserCommandsVisible", m_settings->panelUserCommands());
@@ -596,15 +582,15 @@ void frmMain::saveSettings()
 
 bool frmMain::saveChanges(bool heightMapMode)
 {
-    if ((!heightMapMode && m_fileChanged)) {
+    if (!heightMapMode && m_fileManager->isFileChanged()) {
         int res = QMessageBox::warning(this, this->windowTitle(), tr("G-code program file was changed. Save?"),
                                        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         if (res == QMessageBox::Cancel) return false;
         else if (res == QMessageBox::Yes) on_actFileSave_triggered();
-        m_fileChanged = false;
+        m_fileManager->setFileChanged(false);
     }
 
-    if (m_heightMapChanged) {
+    if (m_fileManager->isHeightMapChanged()) {
         int res = QMessageBox::warning(this, this->windowTitle(), tr("Heightmap file was changed. Save?"),
                                        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         if (res == QMessageBox::Cancel) return false;
@@ -615,7 +601,7 @@ bool frmMain::saveChanges(bool heightMapMode)
             updateRecentFilesMenu(); // Restore g-code files recent menu
         }
 
-        m_fileChanged = false;
+        m_fileManager->setHeightMapChanged(false);
     }
 
     return true;
@@ -652,8 +638,8 @@ void frmMain::updateControlsState() {
     ui->cmdFilePause->setEnabled(m_processingFile && !ui->chkTestMode->isChecked());
     ui->cmdFileAbort->setEnabled(m_processingFile);
     ui->actFileOpen->setEnabled(!m_processingFile);
-    ui->mnuRecent->setEnabled(!m_processingFile && ((m_recentFiles.count() > 0 && !m_heightMapMode)
-                                                      || (m_recentHeightmaps.count() > 0 && m_heightMapMode)));
+    ui->mnuRecent->setEnabled(!m_processingFile && ((m_fileManager->recentFiles().count() > 0 && !m_heightMapMode)
+                                                      || (m_fileManager->recentHeightmaps().count() > 0 && m_heightMapMode)));
     ui->actFileSave->setEnabled(m_programModel.rowCount() > 1);
     ui->actFileSaveAs->setEnabled(m_programModel.rowCount() > 1);
 
@@ -666,8 +652,8 @@ void frmMain::updateControlsState() {
         ui->txtStatus->setStyleSheet(QString("background-color: palette(button); color: palette(text);"));
     }
 
-    this->setWindowTitle(m_programFileName.isEmpty() ? qApp->applicationDisplayName()
-                                                     : m_programFileName.mid(m_programFileName.lastIndexOf("/") + 1) + " - " + qApp->applicationDisplayName());
+    this->setWindowTitle(m_fileManager->programFileName().isEmpty() ? qApp->applicationDisplayName()
+                                                     : m_fileManager->programFileName().mid(m_fileManager->programFileName().lastIndexOf("/") + 1) + " - " + qApp->applicationDisplayName());
 
     if (!m_processingFile) ui->chkKeyboardControl->setChecked(m_storedKeyboardControl);
 
@@ -1336,8 +1322,8 @@ void frmMain::dragEnterEvent(QDragEnterEvent *dee)
     else if (dee->mimeData()->hasFormat("text/uri-list") && dee->mimeData()->urls().count() == 1) {
         QString fileName = dee->mimeData()->urls().at(0).toLocalFile();
 
-        if ((!m_heightMapMode && isGCodeFile(fileName))
-        || (m_heightMapMode && isHeightmapFile(fileName)))
+        if ((!m_heightMapMode && FileManager::isGCodeFile(fileName))
+        || (m_heightMapMode && FileManager::isHeightmapFile(fileName)))
             dee->acceptProposedAction();
     }
 }
@@ -1351,20 +1337,20 @@ void frmMain::dropEvent(QDropEvent *de)
 
         // Load dropped g-code file
         if (!fileName.isEmpty()) {
-            addRecentFile(fileName);
+            m_fileManager->addRecentFile(fileName);
             updateRecentFilesMenu();
             loadFile(fileName);
         // Load dropped text
         } else {
-            m_programFileName.clear();
-            m_fileChanged = true;
+            m_fileManager->clearProgramFileName();
+            m_fileManager->setFileChanged(true);
             loadFile(de->mimeData()->text().split("\n"));
         }
     } else {
         if (!saveChanges(true)) return;
 
         // Load dropped heightmap file
-        addRecentHeightmap(fileName);
+        m_fileManager->addRecentHeightmap(fileName);
         updateRecentFilesMenu();
         loadHeightMap(fileName);
     }
@@ -1380,13 +1366,13 @@ void frmMain::on_cmdFileOpen_clicked()
     if (!m_heightMapMode) {
         if (!saveChanges(false)) return;
 
-        QString fileName  = QFileDialog::getOpenFileName(this, tr("Open"), m_lastFolder,
+        QString fileName  = QFileDialog::getOpenFileName(this, tr("Open"), m_fileManager->lastFolder(),
                                    tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt);;All files (*.*)"));
 
-        if (!fileName.isEmpty()) m_lastFolder = fileName.left(fileName.lastIndexOf(QRegExp("[/\\\\]+")));
+        if (!fileName.isEmpty()) m_fileManager->setLastFolder(fileName.left(fileName.lastIndexOf(QRegExp("[/\\\\]+"))));
 
         if (fileName != "") {
-            addRecentFile(fileName);
+            m_fileManager->addRecentFile(fileName);
             updateRecentFilesMenu();
 
             loadFile(fileName);
@@ -1394,10 +1380,10 @@ void frmMain::on_cmdFileOpen_clicked()
     } else {
         if (!saveChanges(true)) return;
 
-        QString fileName = QFileDialog::getOpenFileName(this, tr("Open"), m_lastFolder, tr("Heightmap files (*.map)"));
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Open"), m_fileManager->lastFolder(), tr("Heightmap files (*.map)"));
 
         if (fileName != "") {
-            addRecentHeightmap(fileName);
+            m_fileManager->addRecentHeightmap(fileName);
             updateRecentFilesMenu();
             loadHeightMap(fileName);
         }
@@ -1414,8 +1400,8 @@ void frmMain::resetHeightmap()
     m_heightMapModel.resize(1, 1);
 
     ui->txtHeightMap->clear();
-    m_heightMapFileName.clear();
-    m_heightMapChanged = false;
+    m_fileManager->clearHeightMapFileName();
+    m_fileManager->setHeightMapChanged(false);
 }
 
 void frmMain::loadFile(QList<QString> data)
@@ -1540,22 +1526,14 @@ void frmMain::loadFile(QList<QString> data)
 
 void frmMain::loadFile(QString fileName)
 {
-    QFile file(fileName);
+    QStringList data = m_fileManager->readGCodeFile(fileName);
 
-    if (!file.open(QIODevice::ReadOnly)) {
+    if (data.isEmpty()) {
         QMessageBox::critical(this, this->windowTitle(), tr("Can't open file:\n") + fileName);
         return;
     }
 
-    // Set filename
-    m_programFileName = fileName;
-
-    // Prepare text stream
-    QTextStream textStream(&file);
-
-    // Read lines
-    QList<QString> data;
-    while (!textStream.atEnd()) data.append(textStream.readLine());
+    m_fileManager->setProgramFileName(fileName);
 
     // Load lines
     loadFile(data);
@@ -2114,7 +2092,7 @@ void frmMain::updateParser()
     ui->glwVisualizer->updateExtremes(m_currentDrawer);
     updateControlsState();
 
-    if (m_currentModel == &m_programModel) m_fileChanged = true;
+    if (m_currentModel == &m_programModel) m_fileManager->setFileChanged(true);
 
     qDebug() << "Update parser time: " << time.elapsed();
 }
@@ -2303,7 +2281,7 @@ void frmMain::on_cmdFileReset_clicked()
 
 void frmMain::on_actFileNew_triggered()
 {
-    qDebug() << "changes:" << m_fileChanged << m_heightMapChanged;
+    qDebug() << "changes:" << m_fileManager->isFileChanged() << m_fileManager->isHeightMapChanged();
 
     if (!saveChanges(m_heightMapMode)) return;
 
@@ -2324,7 +2302,7 @@ void frmMain::on_actFileNew_triggered()
         ui->glwVisualizer->fitDrawable();
         updateProgramEstimatedTime(QList<LineSegment*>());
 
-        m_programFileName = "";
+        m_fileManager->clearProgramFileName();
         ui->chkHeightMapUse->setChecked(false);
         ui->grpHeightMap->setProperty("overrided", false);
         style()->unpolish(ui->grpHeightMap);
@@ -2351,12 +2329,12 @@ void frmMain::on_actFileNew_triggered()
         m_heightMapModel.clear();
         on_cmdFileReset_clicked();
         ui->txtHeightMap->setText(tr("Untitled"));
-        m_heightMapFileName.clear();
+        m_fileManager->clearHeightMapFileName();
 
         updateHeightMapBorderDrawer();
         updateHeightMapGrid();
 
-        m_heightMapChanged = false;
+        m_fileManager->setHeightMapChanged(false);
     }
 
     updateControlsState();
@@ -2367,59 +2345,38 @@ void frmMain::on_cmdClearConsole_clicked()
     ui->txtConsole->clear();
 }
 
-bool frmMain::saveProgramToFile(QString fileName, GCodeTableModel *model)
-{
-    QFile file(fileName);
-    QDir dir;
-
-    qDebug() << "Saving program";
-
-    if (file.exists()) dir.remove(file.fileName());
-    if (!file.open(QIODevice::WriteOnly)) return false;
-
-    QTextStream textStream(&file);
-
-    for (int i = 0; i < model->rowCount() - 1; i++) {
-        textStream << model->data(model->index(i, 1)).toString() << "\r\n";
-    }
-
-    file.close();
-
-    return true;
-}
-
 void frmMain::on_actFileSaveTransformedAs_triggered()
 {
-    QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_lastFolder, tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt)")));
+    QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_fileManager->lastFolder(), tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt)")));
 
     if (!fileName.isEmpty()) {
-        saveProgramToFile(fileName, &m_programHeightmapModel);
+        m_fileManager->saveGCodeFile(fileName, &m_programHeightmapModel);
     }
 }
 
 void frmMain::on_actFileSaveAs_triggered()
 {
     if (!m_heightMapMode) {
-        QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_lastFolder, tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt)")));
+        QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_fileManager->lastFolder(), tr("G-Code files (*.nc *.ncc *.ngc *.tap *.txt)")));
 
-        if (!fileName.isEmpty()) if (saveProgramToFile(fileName, &m_programModel)) {
-            m_programFileName = fileName;
-            m_fileChanged = false;
+        if (!fileName.isEmpty()) if (m_fileManager->saveGCodeFile(fileName, &m_programModel)) {
+            m_fileManager->setProgramFileName(fileName);
+            m_fileManager->setFileChanged(false);
 
-            addRecentFile(fileName);
+            m_fileManager->addRecentFile(fileName);
             updateRecentFilesMenu();
 
             updateControlsState();
         }
     } else {
-        QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_lastFolder, tr("Heightmap files (*.map)")));
+        QString fileName = (QFileDialog::getSaveFileName(this, tr("Save file as"), m_fileManager->lastFolder(), tr("Heightmap files (*.map)")));
 
         if (!fileName.isEmpty()) if (saveHeightMap(fileName)) {
             ui->txtHeightMap->setText(fileName.mid(fileName.lastIndexOf("/") + 1));
-            m_heightMapFileName = fileName;
-            m_heightMapChanged = false;
+            m_fileManager->setHeightMapFileName(fileName);
+            m_fileManager->setHeightMapChanged(false);
 
-            addRecentHeightmap(fileName);
+            m_fileManager->addRecentHeightmap(fileName);
             updateRecentFilesMenu();
 
             updateControlsState();
@@ -2431,13 +2388,13 @@ void frmMain::on_actFileSave_triggered()
 {
     if (!m_heightMapMode) {
         // G-code saving
-        if (m_programFileName.isEmpty()) on_actFileSaveAs_triggered(); else {
-            saveProgramToFile(m_programFileName, &m_programModel);
-            m_fileChanged = false;
+        if (m_fileManager->programFileName().isEmpty()) on_actFileSaveAs_triggered(); else {
+            m_fileManager->saveGCodeFile(m_fileManager->programFileName(), &m_programModel);
+            m_fileManager->setFileChanged(false);
         }
     } else {
         // Height map saving
-        if (m_heightMapFileName.isEmpty()) on_actFileSaveAs_triggered(); else saveHeightMap(m_heightMapFileName);
+        if (m_fileManager->heightMapFileName().isEmpty()) on_actFileSaveAs_triggered(); else saveHeightMap(m_fileManager->heightMapFileName());
     }
 }
 
@@ -2733,20 +2690,6 @@ void frmMain::updateLayouts()
     qApp->processEvents(QEventLoop::ExcludeUserInputEvents);
 }
 
-void frmMain::addRecentFile(QString fileName)
-{
-    m_recentFiles.removeAll(fileName);
-    m_recentFiles.append(fileName);
-    if (m_recentFiles.count() > 5) m_recentFiles.takeFirst();
-}
-
-void frmMain::addRecentHeightmap(QString fileName)
-{
-    m_recentHeightmaps.removeAll(fileName);
-    m_recentHeightmaps.append(fileName);
-    if (m_recentHeightmaps.count() > 5) m_recentHeightmaps.takeFirst();
-}
-
 void frmMain::onActRecentFileTriggered()
 {
     QAction *action = static_cast<QAction*>(sender());
@@ -2776,7 +2719,7 @@ void frmMain::updateRecentFilesMenu()
         }
     }
 
-    foreach (QString file, !m_heightMapMode ? m_recentFiles : m_recentHeightmaps) {
+    foreach (QString file, !m_heightMapMode ? m_fileManager->recentFiles() : m_fileManager->recentHeightmaps()) {
         QAction *action = new QAction(file, this);
         connect(action, SIGNAL(triggered()), this, SLOT(onActRecentFileTriggered()));
         ui->mnuRecent->insertAction(ui->mnuRecent->actions()[0], action);
@@ -2787,7 +2730,7 @@ void frmMain::updateRecentFilesMenu()
 
 void frmMain::on_actRecentClear_triggered()
 {
-    if (!m_heightMapMode) m_recentFiles.clear(); else m_recentHeightmaps.clear();
+    if (!m_heightMapMode) m_fileManager->clearRecentFiles(); else m_fileManager->clearRecentHeightmaps();
     updateRecentFilesMenu();
 }
 
@@ -2917,7 +2860,7 @@ bool frmMain::updateHeightMapGrid()
 
     if (m_currentDrawer == m_probeDrawer) updateParser();
 
-    m_heightMapChanged = true;
+    m_fileManager->setHeightMapChanged(true);
     return true;
 }
 
@@ -2959,7 +2902,7 @@ void frmMain::updateHeightMapInterpolationDrawer(bool reset)
     m_heightMapGridDrawer.update();
 
     // Heightmap changed by table user input
-    if (sender() == &m_heightMapModel) m_heightMapChanged = true;
+    if (sender() == &m_heightMapModel) m_fileManager->setHeightMapChanged(true);
 
     // Reset heightmapped program model
     m_programHeightmapModel.clear();
@@ -3109,7 +3052,7 @@ bool frmMain::saveHeightMap(QString fileName)
 
     file.close();
 
-    m_heightMapChanged = false;
+    m_fileManager->setHeightMapChanged(false);
 
     return true;
 }
@@ -3180,8 +3123,8 @@ void frmMain::loadHeightMap(QString fileName)
     file.close();
 
     ui->txtHeightMap->setText(fileName.mid(fileName.lastIndexOf("/") + 1));
-    m_heightMapFileName = fileName;
-    m_heightMapChanged = false;
+    m_fileManager->setHeightMapFileName(fileName);
+    m_fileManager->setHeightMapChanged(false);
 
     ui->cboHeightMapInterpolationType->setCurrentIndex(list[0].toInt());
     ui->txtHeightMapInterpolationStepX->setValue(list[1].toDouble());
@@ -3203,10 +3146,10 @@ void frmMain::on_cmdHeightMapLoad_clicked()
         return;
     }
 
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open"), m_lastFolder, tr("Heightmap files (*.map)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open"), m_fileManager->lastFolder(), tr("Heightmap files (*.map)"));
 
     if (fileName != "") {
-        addRecentHeightmap(fileName);
+        m_fileManager->addRecentHeightmap(fileName);
         loadHeightMap(fileName);
 
         // If using heightmap
@@ -3474,7 +3417,7 @@ void frmMain::on_chkHeightMapUse_clicked(bool checked)
         connect(ui->tblProgram->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), this, SLOT(onTableCurrentChanged(QModelIndex,QModelIndex)));
 
         // Store changes flag
-        bool fileChanged = m_fileChanged;
+        bool fileChanged = m_fileManager->isFileChanged();
 
         // Update parser
         updateParser();
@@ -3483,7 +3426,7 @@ void frmMain::on_chkHeightMapUse_clicked(bool checked)
         ui->tblProgram->selectRow(0);
 
         // Restore changes flag
-        m_fileChanged = fileChanged;
+        m_fileManager->setFileChanged(fileChanged);
     }
 
     // Update groupbox title

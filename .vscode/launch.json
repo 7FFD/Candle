@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Candle",
+            "type": "cppdbg",
+            "MIMode": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build-macosx/Candle.app/Contents/MacOS/Candle",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "CMake: Build"
+        }
+    ]
+}

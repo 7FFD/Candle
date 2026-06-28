@@ -17,6 +17,7 @@
 #include <exception>
 
 #include "grblserial.h"
+#include "filemanager.h"
 
 #include "parser/gcodeviewparse.h"
 
@@ -224,15 +225,12 @@ private:
     frmSettings *m_settings;
     frmAbout m_frmAbout;
 
+    FileManager *m_fileManager;
+
     QString m_settingsFileName;
-    QString m_programFileName;
-    QString m_heightMapFileName;
-    QString m_lastFolder;
 
     QByteArray m_storedGeometry;
 
-    bool m_fileChanged = false;
-    bool m_heightMapChanged = false;
     bool m_forceRepaintInProgress = false;
 
     QBasicTimer m_timerToolAnimation;
@@ -300,8 +298,6 @@ private:
     // Jog
     QVector3D m_jogVector;
 
-    QStringList m_recentFiles;
-    QStringList m_recentHeightmaps;
 
     void loadFile(QString fileName);
     void loadFile(QList<QString> data);
@@ -318,7 +314,6 @@ private:
     void updateParser();
 
     QTime updateProgramEstimatedTime(QList<LineSegment *> lines);
-    bool saveProgramToFile(QString fileName, GCodeTableModel *model);
     QString feedOverride(QString command);
 
     bool eventFilter(QObject *obj, QEvent *event);
@@ -326,8 +321,6 @@ private:
     void resizeCheckBoxes();
     void updateLayouts();
     void updateRecentFilesMenu();
-    void addRecentFile(QString fileName);
-    void addRecentHeightmap(QString fileName);
     double toMetric(double value);
 
     QRectF borderRectFromTextboxes();
@@ -346,8 +339,6 @@ private:
     void restoreParserState();
     void storeOffsets();
     void restoreOffsets();
-    bool isGCodeFile(QString fileName);
-    bool isHeightmapFile(QString fileName);
     bool compareCoordinates(double x, double y, double z);
     int getConsoleMinHeight();
     void updateOverride(SliderBox *slider, int value, char command);

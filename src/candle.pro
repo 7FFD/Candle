@@ -40,6 +40,7 @@ TRANSLATIONS += translations/candle_en.ts translations/candle_ru.ts translations
 SOURCES += main.cpp\
         frmmain.cpp \
     grblserial.cpp \
+    filemanager.cpp \
     frmsettings.cpp \
     frmabout.cpp \
     drawers/gcodedrawer.cpp \
@@ -71,6 +72,7 @@ SOURCES += main.cpp\
 
 HEADERS  += frmmain.h \
     grblserial.h \
+    filemanager.h \
     frmsettings.h \
     frmabout.h \
     drawers/gcodedrawer.h \
